@@ -2,12 +2,10 @@
 
 namespace App\Jobs\GatewayPushers;
 
-use App\Clients\ApiGatewayClient;
-use App\Clients\CognitoClient;
+use GuzzleHttp\Client;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Log\Logger;
 
 abstract class ParentPushJob implements ShouldQueue
 {
@@ -20,20 +18,10 @@ abstract class ParentPushJob implements ShouldQueue
         $this->data = $data;
     }
 
-    public function handle(CognitoClient $congnito, Logger $logger)
+    public function handle(Client $client)
     {
-        $token = $congnito->getAccessToken();
-
-        $client = (new ApiGatewayClient($token))->getClient();
-
-        $response = $client->request($this->method(), $this->endPoint(), ['json' => $this->data]);
-
-        $logger->alert('AWS API Gateway Response', [
-            'method' => $this->method(),
-            'url' => $this->endPoint(),
-            'data' => $this->data,
-            'statusCode' => $response->getStatusCode(),
-            'body' => $response->getBody()->getContents(),
+        $client->request($this->method(), $this->endPoint(), [
+            'json' => $this->data
         ]);
     }
 

@@ -2,24 +2,20 @@
 
 namespace App\Clients;
 
-use GuzzleHttp\Client;
+use GuzzleHttp\{Client, HandlerStack};
 
 class ApiGatewayClient
 {
-    private $token;
-
-    public function __construct(string $token)
-    {
-        $this->token = $token;
-    }
-
-    public function getClient(): Client
+    public function getClient(string $token): Client
     {
         return new Client([
             'base_uri' => config('services.aws.api_gateway.endpoint'),
 
+            // Hook for logging
+            'handler' => app(HandlerStack::class),
+
             'headers' => [
-                'Authorization' => 'Bearer ' . $this->token,
+                'Authorization' => 'Bearer ' . $token,
                 'Content-Type' => 'application/json'
             ]
         ]);

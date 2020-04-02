@@ -1,7 +1,7 @@
 <?php
 
+use GuzzleHttp\Client;
 use Illuminate\Foundation\Inspiring;
-use App\Clients\{CognitoClient, ApiGatewayClient};
 
 /*
 |--------------------------------------------------------------------------
@@ -18,13 +18,9 @@ Artisan::command('inspire', function () {
     $this->comment(Inspiring::quote());
 })->describe('Display an inspiring quote');
 
-Artisan::command('aws:toll-free', function (CognitoClient $cognitoClient) {
-    $token = $cognitoClient->getAccessToken();
-
-    $client = (new ApiGatewayClient($token))->getClient();
-
+Artisan::command('aws:toll-free', function (Client $client) {
     $result = $client->get('gateway/toll-free');
 
     $this->alert($result->getStatusCode());
-    dump(json_decode($result->getBody()->getContents()));
+    dump(json_decode($result->getBody(), true));
 })->describe('Display the toll-free call report data');
