@@ -2,84 +2,50 @@
 
 namespace App\Http\Controllers\Authentications;
 
-use App\Http\Controllers\Controller;
 use App\User;
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Validator;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Response;
+use Illuminate\Validation\UnauthorizedException;
+use App\Http\Requests\Authentications\{AuthenticateRequest, RegisterRequest};
 
 class AuthenticationController extends Controller
 {
-
-    /**
-     * AuthenticationController constructor.
-     */
     public function __construct()
     {
-
+        $this->middleware('guest');
     }
 
-    public function authenticate()
+    public function authenticate(AuthenticateRequest $request)
     {
-        try {
-            $credentials = request()->only('email', 'password');
-            $rules = ['email' => 'required|email', 'password' => 'required|min:4'];
-            $validator = Validator::make($credentials, $rules);
+        $attempt = auth()->guard('web')->attempt($request->validated());
+        abort_unless($attempt, Response::HTTP_UNAUTHORIZED, 'whoops! invalid admin credential has been used!');
 
-            if ($validator->fails()) {
-                $error = $validator->messages();
-                return response()->json(['status' => false, 'result' => null, 'message' => null, 'error' => $error], 500);
-            }
-            if (!auth()->guard('web')->attempt($credentials)) {
-                return response()->json(['status' => false, 'result' => null, 'message' => 'whoops! invalid admin credential has been used!', 'error' => 'invalid credential'], 401);
-            }
-            $adminUser = Auth::guard('web')->user();
-            if ($adminUser instanceof User) {
-                if ($adminUser->is_active) {
-                    $token = $adminUser->createToken('web')->accessToken;
-                    return response()->json(['status' => true, 'message' => 'authenticated successful', 'result' => $adminUser, 'token' => $token], 200);
-                } else {
-                    return response()->json(['status' => false, 'message' => 'whoops! inactive account', 'result' => null, 'error' => 'inactive account',], 500);
-                }
-            }
-        } catch (\Exception $exception) {
-            return response()->json(['status' => false, 'result' => null, 'message' => 'whoops! exception has occurred', 'error' => $exception->getMessage()], 500);
-        }
+        /** @var User $user */
+        $user = auth()->guard('web')->user();
+        abort_unless($user->is_active, Response::HTTP_UNAUTHORIZED, 'whoops! inactive account');
+
+        $token = $user->createToken('web')->accessToken;
+
+        return response()->json([
+            'message' => 'authenticated successful',
+            'result' => $user,
+            'token' => $token
+        ]);
     }
 
-    public function register()
+    public function register(RegisterRequest $request)
     {
-        try {
-            $credentials = request()->only('full_name', 'phone', 'email', 'password');
-            $rules = [
-                'full_name' => 'required|min:4|max:255',
-                'email' => 'required|email',
-                'password' => 'required|min:8'
-            ];
-            $validator = Validator::make($credentials, $rules);
-            if ($validator->fails()) {
-                $error = $validator->messages();
-                return response()->json(['status' => false, 'message' => "Whoops! Invalid Input", 'error' => $error], 500);
-            }
-            $old_user = User::where('email', '=', $credentials['email'])->first();
-            if ($old_user instanceof User) {
-                return response()->json(['status' => false, 'message' => 'This phone or email is already taken!', 'error' => 'Invalid Email and Phone Number'], 500);
-            } else {
-                $new_user = new User();
-                $new_user->full_name = $credentials['full_name'];
-                $new_user->email = $credentials['email'];
-                $new_user->password = bcrypt($credentials['password']);
-                $new_user->phone = isset($credentials['phone']) ? $credentials['phone'] : null;
-                $new_user->role_id = 1;
-                $new_user->region_id = 1;
-                if ($new_user->save()) {
-                    return response()->json(['status' => true, 'message' => 'registered successfully', 'result' => $new_user], 200);
-                } else {
-                    return response()->json(['status' => false, 'message' => 'whoops! unable to create a user! please try again', 'result' => null, 'error' => null], 500);
-                }
-            }
-        } catch (\Exception $exception) {
-            return response()->json(['status' => false, 'result' => null, 'message' => 'whoops! exception has occurred', 'error' => $exception->getMessage()], 500);
-        }
+        $user = new User($request->validated());
+
+        $user->save([
+            'password' => bcrypt($request->get('password')),
+            'role_id' => 1,
+            'region_id' => 1,
+        ]);
+
+        return response()->json([
+            'message' => 'registered successfully',
+            'result' => $user
+        ]);
     }
 }
